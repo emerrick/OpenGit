@@ -90,11 +90,11 @@ TypeScript's type system guides us to every broken reference.
 - [x] `app/src/main-process/menu/build-default-menu.ts` — "OpenGit" branding, updated help URLs
 - [x] `app/src/lib/stats/stats-store.ts` — `reportStats()` is now a no-op
 
-### Phase 1: Hollow Out the API Layer
+### Phase 1: Hollow Out the API Layer *(COMPLETE)*
 > Stop all HTTP calls to GitHub while keeping exports for compilation.
 
-- [ ] `app/src/lib/api.ts` (2,489 lines) — Keep type exports, make all API methods return empty/throw
-- [ ] `app/src/lib/http.ts` — Keep `getUserAgent()`, gut HTTP functions
+- [x] `app/src/lib/api.ts` (2,489→1,370 lines) — All API methods return empty/throw, types preserved
+- [x] `app/src/lib/http.ts` — `request()` rejects, `parsedResponse()` throws, `getUserAgent()` rebranded to OpenGit
 
 ### Phase 2: Hollow Out GitHub-Specific Stores
 > Make 10+ GitHub stores into no-ops while keeping class signatures.

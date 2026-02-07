@@ -60,19 +60,8 @@ export class APIError extends Error {
  * Note: this doesn't validate the expected shape, and will only fail if it
  * encounters invalid JSON.
  */
-async function deserialize<T>(response: Response): Promise<T> {
-  try {
-    const json = await response.json()
-    return json as T
-  } catch (e) {
-    const contentLength = response.headers.get('Content-Length') || '(missing)'
-    const requestId = response.headers.get('X-GitHub-Request-Id') || '(missing)'
-    log.warn(
-      `deserialize: invalid JSON found at '${response.url}' - status: ${response.status}, length: '${contentLength}' id: '${requestId}'`,
-      e
-    )
-    throw e
-  }
+async function deserialize<T>(_response: Response): Promise<T> {
+  throw new Error('HTTP deserialization is disabled in OpenGit')
 }
 
 /**
@@ -114,69 +103,29 @@ export function getAbsoluteUrl(endpoint: string, path: string): string {
  * then will update the cache with the downloaded resource.
  */
 export function request(
-  endpoint: string,
-  token: string | null,
-  method: HTTPMethod,
-  path: string,
-  jsonBody?: Object,
-  customHeaders?: Object,
-  reloadCache: boolean = false
+  _endpoint: string,
+  _token: string | null,
+  _method: HTTPMethod,
+  _path: string,
+  _jsonBody?: Object,
+  _customHeaders?: Object,
+  _reloadCache: boolean = false
 ): Promise<Response> {
-  const url = getAbsoluteUrl(endpoint, path)
-
-  let headers: any = {
-    Accept: 'application/vnd.github.v3+json, application/json',
-    'Content-Type': 'application/json',
-    'User-Agent': getUserAgent(),
-  }
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  headers = {
-    ...headers,
-    ...customHeaders,
-  }
-
-  const options: RequestInit = {
-    headers,
-    method,
-    body: JSON.stringify(jsonBody),
-  }
-
-  if (reloadCache) {
-    options.cache = 'reload' as RequestCache
-  }
-
-  return fetch(url, options)
+  return Promise.reject(new Error('HTTP requests are disabled in OpenGit'))
 }
 
 /** Get the user agent to use for all requests. */
 export function getUserAgent() {
   const platform = __DARWIN__ ? 'Macintosh' : 'Windows'
-  return `GitHubDesktop/${appProxy.getVersion()} (${platform})`
+  return `OpenGit/${appProxy.getVersion()} (${platform})`
 }
 
 /**
  * If the response was OK, parse it as JSON and return the result. If not, parse
  * the API error and throw it.
  */
-export async function parsedResponse<T>(response: Response): Promise<T> {
-  if (response.ok) {
-    return deserialize<T>(response)
-  } else {
-    let apiError: IAPIError | null
-    // Deserializing the API error could throw. If it does, we'll throw a more
-    // general API error.
-    try {
-      apiError = await deserialize<IAPIError>(response)
-    } catch (e) {
-      throw new APIError(response, null)
-    }
-
-    throw new APIError(response, apiError)
-  }
+export async function parsedResponse<T>(_response: Response): Promise<T> {
+  throw new Error('HTTP response parsing is disabled in OpenGit')
 }
 
 /**

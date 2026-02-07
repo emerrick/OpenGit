@@ -2,38 +2,19 @@ import * as URL from 'url'
 import { Account } from '../models/account'
 
 import {
-  request,
-  parsedResponse,
   HTTPMethod,
   APIError,
-  urlWithQueryString,
-  getUserAgent,
 } from './http'
-import { uuid } from './uuid'
 import { GitProtocol } from './remote-parsing'
 import {
-  getEndpointVersion,
   isDotCom,
   isGHE,
-  isGHES,
   updateEndpointVersion,
 } from './endpoint-capabilities'
-import {
-  clearCertificateErrorSuppressionFor,
-  suppressCertificateErrorFor,
-} from './suppress-certificate-error'
-import { HttpStatusCode } from './http-status-code'
-import { CopilotError } from './copilot-error'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
 const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
-const envAdditionalCookies =
-  process.env['DESKTOP_GITHUB_DOTCOM_ADDITIONAL_COOKIES']
-
-if (envAdditionalCookies !== undefined) {
-  document.cookie += '; ' + envAdditionalCookies
-}
 
 type AffiliationFilter =
   | 'owner'
@@ -824,6 +805,9 @@ export interface IAPICreatePushProtectionBypassResponse {
 
 /**
  * An object for making authenticated requests to the GitHub API
+ *
+ * OpenGit: All methods are stubbed to return empty/default values.
+ * No network calls are made.
  */
 export class API {
   private static readonly tokenInvalidatedListeners =
@@ -859,115 +843,28 @@ export class API {
     this.copilotEndpoint = copilotEndpoint
   }
 
-  /**
-   * Retrieves the name of the Alive channel used by Desktop to receive
-   * high-signal notifications.
-   */
   public async getAliveDesktopChannel(): Promise<IAPIAliveSignedChannel | null> {
-    try {
-      const res = await this.ghRequest('GET', '/desktop_internal/alive-channel')
-      const signedChannel = await parsedResponse<IAPIAliveSignedChannel>(res)
-      return signedChannel
-    } catch (e) {
-      log.warn(`Alive channel request failed: ${e}`)
-      return null
-    }
+    return null
   }
 
-  /**
-   * Retrieves the URL for the Alive websocket.
-   *
-   * @returns The websocket URL if the request succeeded, null if the request
-   * failed with 404, otherwise it will throw an error.
-   *
-   * This behavior is expected by the AliveSession class constructor, to prevent
-   * it from hitting the endpoint many times if it's disabled.
-   */
   public async getAliveWebSocketURL(): Promise<string | null> {
-    try {
-      const res = await this.ghRequest('GET', '/alive_internal/websocket-url')
-      if (res.status === HttpStatusCode.NotFound) {
-        return null
-      }
-      const websocket = await parsedResponse<IAPIAliveWebSocket>(res)
-      return websocket.url
-    } catch (e) {
-      log.warn(`Alive web socket request failed: ${e}`)
-      throw e
-    }
+    return null
   }
 
-  /**
-   * Fetch an issue comment (i.e. a comment on an issue or pull request).
-   *
-   * @param owner The owner of the repository
-   * @param name The name of the repository
-   * @param commentId The ID of the comment
-   *
-   * @returns The comment if it was found, null if it wasn't, or an error
-   * occurred.
-   */
   public async fetchIssueComment(
     owner: string,
     name: string,
     commentId: string
   ): Promise<IAPIComment | null> {
-    try {
-      const response = await this.ghRequest(
-        'GET',
-        `repos/${owner}/${name}/issues/comments/${commentId}`
-      )
-      if (response.status === HttpStatusCode.NotFound) {
-        log.warn(
-          `fetchIssueComment: '${owner}/${name}/issues/comments/${commentId}' returned a 404`
-        )
-        return null
-      }
-      return await parsedResponse<IAPIComment>(response)
-    } catch (e) {
-      log.warn(
-        `fetchIssueComment: an error occurred for '${owner}/${name}/issues/comments/${commentId}'`,
-        e
-      )
-      return null
-    }
+    return null
   }
 
-  /**
-   * Fetch a pull request review comment (i.e. a comment that was posted as part
-   * of a review of a pull request).
-   *
-   * @param owner The owner of the repository
-   * @param name The name of the repository
-   * @param commentId The ID of the comment
-   *
-   * @returns The comment if it was found, null if it wasn't, or an error
-   * occurred.
-   */
   public async fetchPullRequestReviewComment(
     owner: string,
     name: string,
     commentId: string
   ): Promise<IAPIComment | null> {
-    try {
-      const response = await this.ghRequest(
-        'GET',
-        `repos/${owner}/${name}/pulls/comments/${commentId}`
-      )
-      if (response.status === HttpStatusCode.NotFound) {
-        log.warn(
-          `fetchPullRequestReviewComment: '${owner}/${name}/pulls/comments/${commentId}' returned a 404`
-        )
-        return null
-      }
-      return await parsedResponse<IAPIComment>(response)
-    } catch (e) {
-      log.warn(
-        `fetchPullRequestReviewComment: an error occurred for '${owner}/${name}/pulls/comments/${commentId}'`,
-        e
-      )
-      return null
-    }
+    return null
   }
 
   /** Fetch a repo by its owner and name. */
@@ -975,130 +872,38 @@ export class API {
     owner: string,
     name: string
   ): Promise<IAPIFullRepository | null> {
-    try {
-      const response = await this.ghRequest('GET', `repos/${owner}/${name}`)
-      if (response.status === HttpStatusCode.NotFound) {
-        log.warn(`fetchRepository: '${owner}/${name}' returned a 404`)
-        return null
-      }
-      return await parsedResponse<IAPIFullRepository>(response)
-    } catch (e) {
-      log.warn(`fetchRepository: an error occurred for '${owner}/${name}'`, e)
-      return null
-    }
+    return null
   }
 
-  /**
-   * Fetch info needed to clone a repository. That includes:
-   *  - The canonical clone URL for a repository, respecting the protocol
-   *    preference if provided.
-   *  - The default branch of the repository, in case the repository is empty.
-   *    Only available for GitHub repositories.
-   *
-   * Returns null if the request returned a 404 (NotFound). NotFound doesn't
-   * necessarily mean that the repository doesn't exist, it could exist and
-   * the current user just doesn't have the permissions to see it. GitHub.com
-   * doesn't differentiate between not found and permission denied for private
-   * repositories as that would leak the existence of a private repository.
-   *
-   * Note that unlike `fetchRepository` this method will throw for all errors
-   * except 404 NotFound responses.
-   *
-   * @param owner    The repository owner (nodejs in https://github.com/nodejs/node)
-   * @param name     The repository name (node in https://github.com/nodejs/node)
-   * @param protocol The preferred Git protocol (https or ssh)
-   */
   public async fetchRepositoryCloneInfo(
     owner: string,
     name: string,
     protocol: GitProtocol | undefined
   ): Promise<IAPIRepositoryCloneInfo | null> {
-    const response = await this.ghRequest('GET', `repos/${owner}/${name}`, {
-      // Make sure we don't run into cache issues when fetching the repositories,
-      // specially after repositories have been renamed.
-      reloadCache: true,
-    })
-
-    if (response.status === HttpStatusCode.NotFound) {
-      return null
-    }
-
-    const repo = await parsedResponse<IAPIRepository>(response)
-    return {
-      url: protocol === 'ssh' ? repo.ssh_url : repo.clone_url,
-      defaultBranch: repo.default_branch,
-    }
+    return null
   }
 
-  /**
-   * Fetch all repos a user has access to in a streaming fashion. The callback
-   * will be called for each new page fetched from the API.
-   */
   public async streamUserRepositories(
     callback: (repos: ReadonlyArray<IAPIRepository>) => void,
     affiliation?: AffiliationFilter,
     options?: IFetchAllOptions<IAPIRepository>
   ) {
-    try {
-      const base = 'user/repos'
-      const path = affiliation ? `${base}?affiliation=${affiliation}` : base
-
-      await this.fetchAll<IAPIRepository>(path, {
-        ...options,
-        // "But wait, repositories can't have a null owner" you say.
-        // Ordinarily you'd be correct but turns out there's super
-        // rare circumstances where a user has been deleted but the
-        // repository hasn't. Such cases are usually addressed swiftly
-        // but in some cases like GitHub Enterprise instances
-        // they can linger for longer than we'd like so we'll make
-        // sure to exclude any such dangling repository, chances are
-        // they won't be cloneable anyway.
-        onPage: page => {
-          callback(page.filter(x => x.owner !== null))
-          options?.onPage?.(page)
-        },
-      })
-    } catch (error) {
-      log.warn(
-        `streamUserRepositories: failed with endpoint ${this.endpoint}`,
-        error
-      )
-    }
+    // No-op: no repositories to stream
   }
 
   /** Fetch the logged in account. */
   public async fetchAccount(): Promise<IAPIFullIdentity> {
-    try {
-      const response = await this.ghRequest('GET', 'user')
-      const result = await parsedResponse<IAPIFullIdentity>(response)
-      return result
-    } catch (e) {
-      log.warn(`fetchAccount: failed with endpoint ${this.endpoint}`, e)
-      throw e
-    }
+    throw new Error('fetchAccount is disabled in OpenGit')
   }
 
   /** Fetch the current user's emails. */
   public async fetchEmails(): Promise<ReadonlyArray<IAPIEmail>> {
-    try {
-      const response = await this.ghRequest('GET', 'user/emails')
-      const result = await parsedResponse<ReadonlyArray<IAPIEmail>>(response)
-
-      return Array.isArray(result) ? result : []
-    } catch (e) {
-      log.warn(`fetchEmails: failed with endpoint ${this.endpoint}`, e)
-      return []
-    }
+    return []
   }
 
   /** Fetch all the orgs to which the user belongs. */
   public async fetchOrgs(): Promise<ReadonlyArray<IAPIOrganization>> {
-    try {
-      return await this.fetchAll<IAPIOrganization>('user/orgs')
-    } catch (e) {
-      log.warn(`fetchOrgs: failed with endpoint ${this.endpoint}`, e)
-      return []
-    }
+    return []
   }
 
   /** Create a new GitHub repository with the given properties. */
@@ -1108,32 +913,7 @@ export class API {
     description: string,
     private_: boolean
   ): Promise<IAPIFullRepository> {
-    try {
-      const apiPath = org ? `orgs/${org.login}/repos` : 'user/repos'
-      const response = await this.ghRequest('POST', apiPath, {
-        body: {
-          name,
-          description,
-          private: private_,
-        },
-      })
-
-      return await parsedResponse<IAPIFullRepository>(response)
-    } catch (e) {
-      if (e instanceof APIError) {
-        if (org !== null) {
-          throw new Error(
-            `Unable to create repository for organization '${org.login}'. Verify that the repository does not already exist and that you have permission to create a repository there.`
-          )
-        }
-        throw e
-      }
-
-      log.error(`createRepository: failed with endpoint ${this.endpoint}`, e)
-      throw new Error(
-        `Unable to publish repository. Please check if you have an internet connection and try again.`
-      )
-    }
+    throw new Error('createRepository is disabled in OpenGit')
   }
 
   /** Create a new GitHub fork of this repository (owner and name) */
@@ -1141,530 +921,170 @@ export class API {
     owner: string,
     name: string
   ): Promise<IAPIFullRepository> {
-    try {
-      const apiPath = `/repos/${owner}/${name}/forks`
-      const response = await this.ghRequest('POST', apiPath)
-      return await parsedResponse<IAPIFullRepository>(response)
-    } catch (e) {
-      log.error(
-        `forkRepository: failed to fork ${owner}/${name} at endpoint: ${this.endpoint}`,
-        e
-      )
-      throw e
-    }
+    throw new Error('forkRepository is disabled in OpenGit')
   }
 
-  /**
-   * Fetch the issues with the given state that have been created or updated
-   * since the given date.
-   */
   public async fetchIssues(
     owner: string,
     name: string,
     state: 'open' | 'closed' | 'all',
     since: Date | null
   ): Promise<ReadonlyArray<IAPIIssue>> {
-    const params: { [key: string]: string } = {
-      state,
-    }
-    if (since && !isNaN(since.getTime())) {
-      params.since = toGitHubIsoDateString(since)
-    }
-
-    const url = urlWithQueryString(`repos/${owner}/${name}/issues`, params)
-    try {
-      const issues = await this.fetchAll<IAPIIssue>(url)
-
-      // PRs are issues! But we only want Really Seriously Issues.
-      return issues.filter((i: any) => !i.pullRequest)
-    } catch (e) {
-      log.warn(`fetchIssues: failed for repository ${owner}/${name}`, e)
-      throw e
-    }
+    return []
   }
 
   /** Fetch all open pull requests in the given repository. */
   public async fetchAllOpenPullRequests(owner: string, name: string) {
-    const url = urlWithQueryString(`repos/${owner}/${name}/pulls`, {
-      state: 'open',
-    })
-    try {
-      return await this.fetchAll<IAPIPullRequest>(url)
-    } catch (e) {
-      log.warn(`failed fetching open PRs for repository ${owner}/${name}`, e)
-      throw e
-    }
+    return []
   }
 
-  /**
-   * Fetch all pull requests in the given repository that have been
-   * updated on or after the provided date.
-   *
-   * Note: The GitHub API doesn't support providing a last-updated
-   * limitation for PRs like it does for issues so we're emulating
-   * the issues API by sorting PRs descending by last updated and
-   * only grab as many pages as we need to until we no longer receive
-   * PRs that have been update more recently than the `since`
-   * parameter.
-   *
-   * If there's more than `maxResults` updated PRs since the last time
-   * we fetched this method will throw an error such that we can abort
-   * this strategy and commence loading all open PRs instead.
-   */
   public async fetchUpdatedPullRequests(
     owner: string,
     name: string,
     since: Date,
-    // 320 is chosen because with a ramp-up page size starting with
-    // a page size of 10 we'll reach 320 in exactly 7 pages. See
-    // getNextPagePathWithIncreasingPageSize
     maxResults = 320
   ) {
-    const sinceTime = since.getTime()
-    const url = urlWithQueryString(`repos/${owner}/${name}/pulls`, {
-      state: 'all',
-      sort: 'updated',
-      direction: 'desc',
-    })
-
-    try {
-      const prs = await this.fetchAll<IAPIPullRequest>(url, {
-        // We use a page size smaller than our default 100 here because we
-        // expect that the majority use case will return much less than
-        // 100 results. Given that as long as _any_ PR has changed we'll
-        // get the full list back (PRs doesn't support ?since=) we want
-        // to keep this number fairly conservative in order to not use
-        // up bandwidth needlessly while balancing it such that we don't
-        // have to use a lot of requests to update our database. We then
-        // ramp up the page size (see getNextPagePathWithIncreasingPageSize)
-        // if it turns out there's a lot of updated PRs.
-        perPage: 10,
-        getNextPagePath: getNextPagePathWithIncreasingPageSize,
-        continue(results) {
-          if (results.length >= maxResults) {
-            throw new MaxResultsError('got max pull requests, aborting')
-          }
-
-          // Given that we sort the results in descending order by their
-          // updated_at field we can safely say that if the last item
-          // is modified after our sinceTime then haven't reached the
-          // end of updated PRs.
-          const last = results.at(-1)
-          return last !== undefined && Date.parse(last.updated_at) > sinceTime
-        },
-        // We can't ignore errors here as that might mean that we haven't
-        // retrieved enough pages to fully capture the changes since the
-        // last time we updated. Ignoring errors here would mean that we'd
-        // store an incorrect lastUpdated field in the database.
-        suppressErrors: false,
-      })
-      return prs.filter(pr => Date.parse(pr.updated_at) >= sinceTime)
-    } catch (e) {
-      log.warn(`failed fetching updated PRs for repository ${owner}/${name}`, e)
-      throw e
-    }
+    return []
   }
 
-  /**
-   * Fetch a single pull request in the given repository
-   */
   public async fetchPullRequest(owner: string, name: string, prNumber: string) {
-    try {
-      const path = `/repos/${owner}/${name}/pulls/${prNumber}`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIPullRequest>(response)
-    } catch (e) {
-      log.warn(`failed fetching PR for ${owner}/${name}/pulls/${prNumber}`, e)
-      throw e
-    }
+    throw new Error('fetchPullRequest is disabled in OpenGit')
   }
 
-  /**
-   * Fetch a single pull request review in the given repository
-   */
   public async fetchPullRequestReview(
     owner: string,
     name: string,
     prNumber: string,
     reviewId: string
   ) {
-    try {
-      const path = `/repos/${owner}/${name}/pulls/${prNumber}/reviews/${reviewId}`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIPullRequestReview>(response)
-    } catch (e) {
-      log.debug(
-        `failed fetching PR review ${reviewId} for ${owner}/${name}/pulls/${prNumber}`,
-        e
-      )
-      return null
-    }
+    return null
   }
 
-  /** Fetches all reviews from a given pull request. */
   public async fetchPullRequestReviews(
     owner: string,
     name: string,
     prNumber: string
   ) {
-    try {
-      const path = `/repos/${owner}/${name}/pulls/${prNumber}/reviews`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIPullRequestReview[]>(response)
-    } catch (e) {
-      log.debug(
-        `failed fetching PR reviews for ${owner}/${name}/pulls/${prNumber}`,
-        e
-      )
-      return []
-    }
+    return []
   }
 
-  /** Fetches all review comments from a given pull request. */
   public async fetchPullRequestReviewComments(
     owner: string,
     name: string,
     prNumber: string,
     reviewId: string
   ) {
-    try {
-      const path = `/repos/${owner}/${name}/pulls/${prNumber}/reviews/${reviewId}/comments`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIComment[]>(response)
-    } catch (e) {
-      log.debug(
-        `failed fetching PR review comments for ${owner}/${name}/pulls/${prNumber}`,
-        e
-      )
-      return []
-    }
+    return []
   }
 
-  /** Fetches all review comments from a given pull request. */
   public async fetchPullRequestComments(
     owner: string,
     name: string,
     prNumber: string
   ) {
-    try {
-      const path = `/repos/${owner}/${name}/pulls/${prNumber}/comments`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIComment[]>(response)
-    } catch (e) {
-      log.debug(
-        `failed fetching PR comments for ${owner}/${name}/pulls/${prNumber}`,
-        e
-      )
-      return []
-    }
+    return []
   }
 
-  /** Fetches all comments from a given issue. */
   public async fetchIssueComments(
     owner: string,
     name: string,
     issueNumber: string
   ) {
-    try {
-      const path = `/repos/${owner}/${name}/issues/${issueNumber}/comments`
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIComment[]>(response)
-    } catch (e) {
-      log.debug(
-        `failed fetching issue comments for ${owner}/${name}/issues/${issueNumber}`,
-        e
-      )
-      return []
-    }
+    return []
   }
 
-  /**
-   * Get the combined status for the given ref.
-   */
   public async fetchCombinedRefStatus(
     owner: string,
     name: string,
     ref: string,
     reloadCache: boolean = false
   ): Promise<IAPIRefStatus | null> {
-    const safeRef = encodeURIComponent(ref)
-    const path = `repos/${owner}/${name}/commits/${safeRef}/status?per_page=100`
-    const response = await this.ghRequest('GET', path, {
-      reloadCache,
-    })
-
-    try {
-      return await parsedResponse<IAPIRefStatus>(response)
-    } catch (err) {
-      log.debug(
-        `Failed fetching check runs for ref ${ref} (${owner}/${name})`,
-        err
-      )
-      return null
-    }
+    return null
   }
 
-  /**
-   * Get any check run results for the given ref.
-   */
   public async fetchRefCheckRuns(
     owner: string,
     name: string,
     ref: string,
     reloadCache: boolean = false
   ): Promise<IAPIRefCheckRuns | null> {
-    const safeRef = encodeURIComponent(ref)
-    const path = `repos/${owner}/${name}/commits/${safeRef}/check-runs?per_page=100`
-    const headers = {
-      Accept: 'application/vnd.github.antiope-preview+json',
-    }
-
-    const response = await this.ghRequest('GET', path, {
-      customHeaders: headers,
-      reloadCache,
-    })
-
-    try {
-      return await parsedResponse<IAPIRefCheckRuns>(response)
-    } catch (err) {
-      log.debug(
-        `Failed fetching check runs for ref ${ref} (${owner}/${name})`,
-        err
-      )
-      return null
-    }
+    return null
   }
 
-  /**
-   * List workflow runs for a repository filtered by branch and event type of
-   * pull_request
-   */
   public async fetchPRWorkflowRunsByBranchName(
     owner: string,
     name: string,
     branchName: string
   ): Promise<IAPIWorkflowRuns | null> {
-    const path = `repos/${owner}/${name}/actions/runs?event=pull_request&branch=${encodeURIComponent(
-      branchName
-    )}`
-    const customHeaders = {
-      Accept: 'application/vnd.github.antiope-preview+json',
-    }
-    const response = await this.ghRequest('GET', path, { customHeaders })
-    try {
-      return await parsedResponse<IAPIWorkflowRuns>(response)
-    } catch (err) {
-      log.debug(
-        `Failed fetching workflow runs for ${branchName} (${owner}/${name})`
-      )
-    }
     return null
   }
 
-  /**
-   * Return the workflow run for a given check_suite_id.
-   *
-   * A check suite is a reference for a set check runs.
-   * A workflow run is a reference for set a of workflows for the GitHub Actions
-   * check runner.
-   *
-   * If a check suite is comprised of check runs ran by actions, there will be
-   * one workflow run that represents that check suite. Thus, if this api should
-   * either return an empty array indicating there are no actions runs for that
-   * check_suite_id (so check suite was not ran by actions) or an array with a
-   * single element.
-   */
   public async fetchPRActionWorkflowRunByCheckSuiteId(
     owner: string,
     name: string,
     checkSuiteId: number
   ): Promise<IAPIWorkflowRun | null> {
-    const path = `repos/${owner}/${name}/actions/runs?event=pull_request&check_suite_id=${checkSuiteId}`
-    const customHeaders = {
-      Accept: 'application/vnd.github.antiope-preview+json',
-    }
-    const response = await this.ghRequest('GET', path, { customHeaders })
-    try {
-      const apiWorkflowRuns = await parsedResponse<IAPIWorkflowRuns>(response)
-
-      if (apiWorkflowRuns.workflow_runs.length > 0) {
-        return apiWorkflowRuns.workflow_runs[0]
-      }
-    } catch (err) {
-      log.debug(
-        `Failed fetching workflow runs for ${checkSuiteId} (${owner}/${name})`
-      )
-    }
     return null
   }
 
-  /**
-   * List workflow run jobs for a given workflow run
-   */
   public async fetchWorkflowRunJobs(
     owner: string,
     name: string,
     workflowRunId: number
   ): Promise<IAPIWorkflowJobs | null> {
-    const path = `repos/${owner}/${name}/actions/runs/${workflowRunId}/jobs`
-    const customHeaders = {
-      Accept: 'application/vnd.github.antiope-preview+json',
-    }
-    const response = await this.ghRequest('GET', path, {
-      customHeaders,
-    })
-    try {
-      return await parsedResponse<IAPIWorkflowJobs>(response)
-    } catch (err) {
-      log.debug(
-        `Failed fetching workflow jobs (${owner}/${name}) workflow run: ${workflowRunId}`
-      )
-    }
     return null
   }
 
-  /**
-   * Triggers GitHub to rerequest an existing check suite, without pushing new
-   * code to a repository.
-   */
   public async rerequestCheckSuite(
     owner: string,
     name: string,
     checkSuiteId: number
   ): Promise<boolean> {
-    const path = `/repos/${owner}/${name}/check-suites/${checkSuiteId}/rerequest`
-
-    return this.ghRequest('POST', path)
-      .then(x => x.ok)
-      .catch(err => {
-        log.debug(
-          `Failed retry check suite id ${checkSuiteId} (${owner}/${name})`,
-          err
-        )
-        return false
-      })
+    return false
   }
 
-  /**
-   * Re-run all of the failed jobs and their dependent jobs in a workflow run
-   * using the id of the workflow run.
-   */
   public async rerunFailedJobs(
     owner: string,
     name: string,
     workflowRunId: number
   ): Promise<boolean> {
-    const path = `/repos/${owner}/${name}/actions/runs/${workflowRunId}/rerun-failed-jobs`
-
-    return this.ghRequest('POST', path)
-      .then(x => x.ok)
-      .catch(err => {
-        log.debug(
-          `Failed to rerun failed workflow jobs for (${owner}/${name}): ${workflowRunId}`,
-          err
-        )
-        return false
-      })
+    return false
   }
 
-  /**
-   * Re-run a job and its dependent jobs in a workflow run.
-   */
   public async rerunJob(
     owner: string,
     name: string,
     jobId: number
   ): Promise<boolean> {
-    const path = `/repos/${owner}/${name}/actions/jobs/${jobId}/rerun`
-
-    return this.ghRequest('POST', path)
-      .then(x => x.ok)
-      .catch(err => {
-        log.debug(
-          `Failed to rerun workflow job (${owner}/${name}): ${jobId}`,
-          err
-        )
-        return false
-      })
+    return false
   }
 
   public async getAvatarToken() {
-    return this.ghRequest('GET', `/desktop/avatar-token`)
-      .then(x => x.json())
-      .then((x: unknown) =>
-        x &&
-        typeof x === 'object' &&
-        'avatar_token' in x &&
-        typeof x.avatar_token === 'string'
-          ? x.avatar_token
-          : null
-      )
-      .catch(err => {
-        log.debug(`Failed to load avatar token`, err)
-        return null
-      })
+    return null
   }
 
-  /**
-   * Gets a single check suite using its id
-   */
   public async fetchCheckSuite(
     owner: string,
     name: string,
     checkSuiteId: number
   ): Promise<IAPICheckSuite | null> {
-    const path = `/repos/${owner}/${name}/check-suites/${checkSuiteId}`
-    const response = await this.ghRequest('GET', path)
-
-    try {
-      return await parsedResponse<IAPICheckSuite>(response)
-    } catch (_) {
-      log.debug(
-        `[fetchCheckSuite] Failed fetch check suite id ${checkSuiteId} (${owner}/${name})`
-      )
-    }
-
     return null
   }
 
-  /**
-   * Get branch protection info to determine if a user can push to a given branch.
-   *
-   * Note: if request fails, the default returned value assumes full access for the user
-   */
   public async fetchPushControl(
     owner: string,
     name: string,
     branch: string
   ): Promise<IAPIPushControl> {
-    const path = `repos/${owner}/${name}/branches/${encodeURIComponent(
-      branch
-    )}/push_control`
-
-    const headers: any = {
-      Accept: 'application/vnd.github.phandalin-preview',
-    }
-
-    try {
-      const response = await this.ghRequest('GET', path, {
-        customHeaders: headers,
-      })
-      return await parsedResponse<IAPIPushControl>(response)
-    } catch (err) {
-      log.info(
-        `[fetchPushControl] unable to check if branch is potentially pushable`,
-        err
-      )
-      return {
-        pattern: null,
-        required_signatures: false,
-        required_status_checks: [],
-        required_approving_review_count: 0,
-        required_linear_history: false,
-        allow_actor: true,
-        allow_deletions: true,
-        allow_force_pushes: true,
-      }
+    return {
+      pattern: null,
+      required_signatures: false,
+      required_status_checks: [],
+      required_approving_review_count: 0,
+      required_linear_history: false,
+      allow_actor: true,
+      allow_deletions: true,
+      allow_force_pushes: true,
     }
   }
 
@@ -1672,133 +1092,36 @@ export class API {
     owner: string,
     name: string
   ): Promise<ReadonlyArray<IAPIBranch>> {
-    const path = `repos/${owner}/${name}/branches?protected=true`
-    try {
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIBranch[]>(response)
-    } catch (err) {
-      log.info(
-        `[fetchProtectedBranches] unable to list protected branches`,
-        err
-      )
-      return new Array<IAPIBranch>()
-    }
+    return []
   }
 
-  /**
-   * Fetches all repository rules that apply to the provided branch.
-   */
   public async fetchRepoRulesForBranch(
     owner: string,
     name: string,
     branch: string
   ): Promise<ReadonlyArray<IAPIRepoRule>> {
-    const path = `repos/${owner}/${name}/rules/branches/${encodeURIComponent(
-      branch
-    )}`
-    try {
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIRepoRule[]>(response)
-    } catch (err) {
-      // If the repository isn't owned by the current user there's no way for us
-      // to preemptively check whether rulesets are enabled so we give it a shot
-      // but there's no need to log if it fails. Same with 404s, i.e the user
-      // doesn't have access to the repo any more or it's been deleted.
-      if (!isRulesetsNotEnabledError(err) && !isNotFoundApiError(err)) {
-        log.info(
-          `[fetchRepoRulesForBranch] unable to fetch repo rules for branch: ${branch} | ${path}`,
-          err
-        )
-      }
-      return new Array<IAPIRepoRule>()
-    }
+    return []
   }
 
-  /**
-   * Fetches slim versions of all repo rulesets for the given repository. Utilize the cache
-   * in IAppState instead of querying this if possible.
-   */
   public async fetchAllRepoRulesets(
     owner: string,
     name: string
   ): Promise<ReadonlyArray<IAPISlimRepoRuleset> | null> {
-    const path = `repos/${owner}/${name}/rulesets`
-    try {
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<ReadonlyArray<IAPISlimRepoRuleset>>(response)
-    } catch (err) {
-      // If the repository isn't owned by the current user there's no way for us
-      // to preemptively check whether rulesets are enabled so we give it a shot
-      // but there's no need to log if it fails. Same with 404s, i.e the user
-      // doesn't have access to the repo any more or it's been deleted.
-      if (!isRulesetsNotEnabledError(err) && !isNotFoundApiError(err)) {
-        log.info(
-          `[fetchAllRepoRulesets] unable to fetch all repo rulesets | ${path}`,
-          err
-        )
-      }
-      return null
-    }
+    return null
   }
 
-  /**
-   * Fetches the repo ruleset with the given ID. Utilize the cache in IAppState
-   * instead of querying this if possible.
-   */
   public async fetchRepoRuleset(
     owner: string,
     name: string,
     id: number
   ): Promise<IAPIRepoRuleset | null> {
-    const path = `repos/${owner}/${name}/rulesets/${id}`
-    try {
-      const response = await this.ghRequest('GET', path)
-      return await parsedResponse<IAPIRepoRuleset>(response)
-    } catch (err) {
-      log.info(
-        `[fetchRepoRuleset] unable to fetch repo ruleset for ID: ${id} | ${path}`,
-        err
-      )
-      return null
-    }
+    return null
   }
 
-  /**
-   * Authenticated requests to a paginating resource such as issues.
-   *
-   * Follows the GitHub API hypermedia links to get the subsequent
-   * pages when available, buffers all items and returns them in
-   * one array when done.
-   */
   private async fetchAll<T>(path: string, options?: IFetchAllOptions<T>) {
-    const buf = new Array<T>()
-    const opts: IFetchAllOptions<T> = { perPage: 100, ...options }
-    const params = { per_page: `${opts.perPage}` }
-
-    let nextPath: string | null = urlWithQueryString(path, params)
-    let page: ReadonlyArray<T> = []
-    do {
-      const response: Response = await this.ghRequest('GET', nextPath)
-      if (opts.suppressErrors !== false && !response.ok) {
-        log.warn(`fetchAll: '${path}' returned a ${response.status}`)
-        return buf
-      }
-
-      page = await parsedResponse<ReadonlyArray<T>>(response)
-      if (page) {
-        buf.push(...page)
-        opts.onPage?.(page)
-      }
-
-      nextPath = opts.getNextPagePath
-        ? opts.getNextPagePath(response)
-        : getNextPagePathFromLink(response)
-    } while (nextPath && (!opts.continue || (await opts.continue(buf))))
-
-    return buf
+    return []
   }
 
-  /** Make an authenticated request to the client's endpoint with its token. */
   private async request(
     endpoint: string,
     method: HTTPMethod,
@@ -1809,21 +1132,9 @@ export class API {
       reloadCache?: boolean
     } = {}
   ): Promise<Response> {
-    return await request(
-      endpoint,
-      this.token,
-      method,
-      path,
-      options.body,
-      options.customHeaders,
-      options.reloadCache
-    )
+    throw new Error('API.request is disabled in OpenGit')
   }
 
-  /**
-   * Make an authenticated request to the client's endpoint with its token.
-   * Used for GitHub API requests.
-   */
   private async ghRequest(
     method: HTTPMethod,
     path: string,
@@ -1833,342 +1144,49 @@ export class API {
       reloadCache?: boolean
     } = {}
   ): Promise<Response> {
-    const response = await this.request(this.endpoint, method, path, options)
-
-    // Only consider invalid token when the status is 401 and the response has
-    // the X-GitHub-Request-Id header, meaning it comes from GH(E) and not from
-    // any kind of proxy/gateway. For more info see #12943
-    // We're also not considering a token has been invalidated when the reason
-    // behind a 401 is the fact that any kind of 2 factor auth is required.
-    if (
-      response.status === HttpStatusCode.Unauthorized &&
-      response.headers.has('X-GitHub-Request-Id') &&
-      !response.headers.has('X-GitHub-OTP')
-    ) {
-      API.emitTokenInvalidated(this.endpoint, this.token)
-    }
-
-    tryUpdateEndpointVersionFromResponse(this.endpoint, response)
-
-    return response
+    throw new Error('API.ghRequest is disabled in OpenGit')
   }
 
-  /**
-   * Make an authenticated request to the client's Copilot endpoint with its
-   * token. Used for Copilot API requests.
-   */
   private async copilotRequest(
     path: string,
     message: string
   ): Promise<CopilotChatCompletionResponse> {
-    if (!this.copilotEndpoint) {
-      throw new Error('No Copilot endpoint available')
-    }
-
-    const response = await this.request(this.copilotEndpoint, 'POST', path, {
-      body: {
-        messages: [
-          {
-            role: 'user',
-            content: message,
-          },
-        ],
-        stream: false,
-        response_format: {
-          type: 'json_object',
-        },
-      },
-      customHeaders: {
-        'X-Initiator': 'user',
-        'X-Interaction-ID': uuid(),
-        'X-Interaction-Type': 'generateCommitMessage',
-      },
-    })
-
-    if (response.status === HttpStatusCode.TooManyRequests) {
-      const retryAfter = response.headers.get('Retry-After')
-      if (retryAfter) {
-        throw new CopilotError(
-          `Rate limited, retry after ${retryAfter} seconds.`,
-          response.status
-        )
-      } else {
-        throw new CopilotError(
-          'Rate limited, try again in a few minutes.',
-          response.status
-        )
-      }
-    } else if (response.status === HttpStatusCode.PaymentRequired) {
-      const errorMsg =
-        (await response.text()) || 'You have reached your quota limit.'
-
-      throw new CopilotError(errorMsg, response.status)
-    } else if (response.status === HttpStatusCode.Unauthorized) {
-      throw new CopilotError(
-        'Unauthorized: error with authentication.',
-        response.status
-      )
-    } else if (response.status === HttpStatusCode.Forbidden) {
-      const body = await response.text()
-      if (body.includes('unauthorized: not licensed to use Copilot')) {
-        throw new CopilotError(
-          'Unauthorized: not licensed to use Copilot.',
-          response.status
-        )
-      } else if (
-        body.includes(
-          'unauthorized: not authorized to use this Copilot feature',
-          response.status
-        )
-      ) {
-        throw new CopilotError(
-          'Unauthorized: not authorized to use this Copilot feature.',
-          response.status
-        )
-      } else if (
-        body.includes('integration does not have GitHub chat enabled')
-      ) {
-        throw new CopilotError(
-          'Integration does not have GitHub chat enabled.',
-          response.status
-        )
-      } else {
-        throw new CopilotError('Unauthorized: unknown.', response.status)
-      }
-    } else if (response.status === 466) {
-      throw new CopilotError(
-        'Client issue: unsupported API version.',
-        response.status
-      )
-    } else if (response.status >= HttpStatusCode.BadRequest) {
-      const internalError = `Internal server error, code: ${
-        response.status
-      }, request ID: ${response.headers.get('X-Github-Request-Id')}.`
-      console.error(
-        `Copilot request failed with status ${response.status}: ${internalError}`
-      )
-      throw new CopilotError(
-        'Something went wrong. Please, try again later.',
-        response.status
-      )
-    }
-
-    const text = await response.text()
-
-    // Responses include multiple lines starting with "data: " followed by
-    // a JSON object. We're only interested in the JSON object of the first line.
-    const lines = text.split('\n')
-    const DataLinePrefix = 'data: '
-
-    for (const line of lines) {
-      if (line.startsWith(DataLinePrefix)) {
-        const json = JSON.parse(line.substring(DataLinePrefix.length))
-        return json as CopilotChatCompletionResponse
-      }
-    }
-
-    throw new Error('No data line found in response')
+    throw new Error('Copilot requests are disabled in OpenGit')
   }
 
-  /**
-   * Get the allowed poll interval for fetching. If an error occurs it will
-   * return null.
-   */
   public async getFetchPollInterval(
     owner: string,
     name: string
   ): Promise<number | null> {
-    const path = `repos/${owner}/${name}/git`
-    try {
-      const response = await this.ghRequest('HEAD', path)
-      const interval = response.headers.get('x-poll-interval')
-      if (interval) {
-        const parsed = parseInt(interval, 10)
-        return isNaN(parsed) ? null : parsed
-      }
-      return null
-    } catch (e) {
-      log.warn(`getFetchPollInterval: failed for ${owner}/${name}`, e)
-      return null
-    }
+    return null
   }
 
-  /** Fetch the mentionable users for the repository. */
   public async fetchMentionables(
     owner: string,
     name: string,
     etag: string | undefined
   ): Promise<IAPIMentionablesResponse | null> {
-    // NB: this custom `Accept` is required for the `mentionables` endpoint.
-    const headers: any = {
-      Accept: 'application/vnd.github.jerry-maguire-preview',
-    }
-
-    if (etag !== undefined) {
-      headers['If-None-Match'] = etag
-    }
-
-    try {
-      const path = `repos/${owner}/${name}/mentionables/users`
-      const response = await this.ghRequest('GET', path, {
-        customHeaders: headers,
-      })
-
-      if (response.status === HttpStatusCode.NotFound) {
-        log.warn(`fetchMentionables: '${path}' returned a 404`)
-        return null
-      }
-
-      if (response.status === HttpStatusCode.NotModified) {
-        return null
-      }
-      const users = await parsedResponse<ReadonlyArray<IAPIMentionableUser>>(
-        response
-      )
-      const etag = response.headers.get('etag') || undefined
-      return { users, etag }
-    } catch (e) {
-      log.warn(`fetchMentionables: failed for ${owner}/${name}`, e)
-      return null
-    }
+    return null
   }
 
-  /**
-   * Retrieve the public profile information of a user with
-   * a given username.
-   */
   public async fetchUser(login: string): Promise<IAPIFullIdentity | null> {
-    try {
-      const response = await this.ghRequest(
-        'GET',
-        `users/${encodeURIComponent(login)}`
-      )
-
-      if (response.status === HttpStatusCode.NotFound) {
-        return null
-      }
-
-      return await parsedResponse<IAPIFullIdentity>(response)
-    } catch (e) {
-      log.warn(`fetchUser: failed with endpoint ${this.endpoint}`, e)
-      throw e
-    }
+    return null
   }
 
-  /**
-   * Fetches the Desktop-specific features that are enabled for the user.
-   *
-   * @returns An array of strings with the feature flags enabled for the user.
-   */
   public async fetchFeatureFlags(): Promise<ReadonlyArray<string> | undefined> {
-    try {
-      const response = await this.ghRequest('GET', '/desktop_internal/features')
-      const featuresResponse = await parsedResponse<IUserFeaturesResponse>(
-        response
-      )
-      return featuresResponse.features
-    } catch (e) {
-      log.warn(`fetchFeatureFlags: failed with endpoint ${this.endpoint}`, e)
-      return undefined
-    }
+    return undefined
   }
 
-  /**
-   * Fetches the Copilot info related to the user (license and API endpoint).
-   *
-   * @returns Copilot license and API endpoint.
-   */
   public async fetchUserCopilotInfo(): Promise<UserCopilotInfo | undefined> {
-    // Copilot is not available on GHES
-    if (isGHES(this.endpoint)) {
-      return undefined
-    }
-
-    const graphql = `
-    {
-      viewer {
-        copilotEndpoints {
-          api
-        }
-
-        isCopilotDesktopEnabled
-      }
-    }
-    `
-
-    try {
-      const response = await this.ghRequest('POST', '/graphql', {
-        body: { query: graphql },
-      })
-      if (response === null) {
-        return undefined
-      }
-
-      const json: ViewerCopilotResponse =
-        (await response.json()) as ViewerCopilotResponse
-      const { viewer } = json.data
-      return {
-        copilotEndpoint: viewer.copilotEndpoints.api,
-        isCopilotDesktopEnabled: viewer.isCopilotDesktopEnabled,
-      }
-    } catch (e) {
-      log.warn(`fetchUserCopilotInfo: failed with endpoint ${this.endpoint}`, e)
-      return undefined
-    }
+    return undefined
   }
 
-  /**
-   * Leverages Copilot to generate the commit details (title and description)
-   * for a given diff.
-   *
-   * @param diff Diff of changes to be committed, in git format
-   * @returns Commit details (title and description) generated by Copilot
-   */
   public async getDiffChangesCommitMessage(
     diff: string
   ): Promise<ICopilotCommitMessage> {
-    try {
-      const response = await this.copilotRequest(
-        '/agents/github-desktop-commit-message-generation',
-        diff
-      )
-
-      const choice = response.choices.at(0)
-
-      if (!choice) {
-        throw new Error('No choice found in response')
-      }
-
-      const message = choice.message.content
-      if (!message) {
-        throw new Error('No message found in response')
-      }
-
-      return JSON.parse(message)
-    } catch (e) {
-      log.warn(
-        `getDiffChangesCommitMessage: failed with endpoint ${this.endpoint}`,
-        e
-      )
-      throw e
-    }
+    throw new Error('Copilot commit messages are disabled in OpenGit')
   }
 
-  /**
-   * Creates a push protection bypass for a repository.
-   *
-   * This method sends a POST request to the GitHub API to create a bypass
-   * for push protection in a specified repository. The bypass is associated
-   * with a reason and a placeholder ID.
-   *
-   * @param owner - The owner of the repository.
-   * @param name - The name of the repository.
-   * @param reason - The reason for creating the bypass - false_positive, used_in_tests, will_fix_later.
-   * @param placeholderId - The placeholder ID associated with the bypass.
-   * @param bypassURL - The URL to retry the bypass creation on Github.com in case of failure.
-   * @returns A promise that resolves to the response of the bypass creation.
-   * @throws An error if the bypass creation fails, including a warning log.
-   */
   public async createPushProtectionBypass(
     owner: string,
     name: string,
@@ -2176,49 +1194,12 @@ export class API {
     placeholderId: string,
     bypassURL: string
   ): Promise<IAPICreatePushProtectionBypassResponse> {
-    const path = `repos/${owner}/${name}/secret-scanning/push-protection-bypasses`
-    const body = {
-      reason,
-      placeholder_id: placeholderId,
-    }
-
-    try {
-      const response = await this.ghRequest('POST', path, { body })
-      return await parsedResponse<IAPICreatePushProtectionBypassResponse>(
-        response
-      )
-    } catch (e) {
-      const msg = `Unable to create push protection bypass.
-
-    Repository: ${owner}/${name}
-    Reason: ${reason}
-    Placeholder Id: ${placeholderId}.
-
-    Try again at: ${bypassURL}`
-
-      log.error(msg, e)
-      throw new Error(msg)
-    }
+    throw new Error('Push protection bypass is disabled in OpenGit')
   }
 }
 
 export async function deleteToken(account: Account) {
-  try {
-    const creds = Buffer.from(`${ClientID}:${ClientSecret}`).toString('base64')
-    const response = await request(
-      account.endpoint,
-      null,
-      'DELETE',
-      `applications/${ClientID}/token`,
-      { access_token: account.token },
-      { Authorization: `Basic ${creds}` }
-    )
-
-    return response.status === 204
-  } catch (e) {
-    log.error(`deleteToken: failed with endpoint ${account.endpoint}`, e)
-    return false
-  }
+  return false
 }
 
 /** Fetch the user authenticated by the token. */
@@ -2226,32 +1207,7 @@ export async function fetchUser(
   endpoint: string,
   token: string
 ): Promise<Account> {
-  const api = new API(endpoint, token)
-  try {
-    const [user, emails, copilotInfo, features] = await Promise.all([
-      api.fetchAccount(),
-      api.fetchEmails(),
-      api.fetchUserCopilotInfo(),
-      api.fetchFeatureFlags(),
-    ])
-
-    return new Account(
-      user.login,
-      endpoint,
-      token,
-      emails,
-      user.avatar_url,
-      user.id,
-      user.name || user.login,
-      user.plan?.name,
-      copilotInfo?.copilotEndpoint,
-      copilotInfo?.isCopilotDesktopEnabled,
-      features
-    )
-  } catch (e) {
-    log.warn(`fetchUser: failed with endpoint ${endpoint}`, e)
-    throw e
-  }
+  throw new Error('fetchUser is disabled in OpenGit')
 }
 
 /**
@@ -2348,40 +1304,16 @@ export function getOAuthAuthorizationURL(
   endpoint: string,
   state: string
 ): string {
-  const urlBase = getHTMLURL(endpoint)
-  const scope = encodeURIComponent(oauthScopes.join(' '))
-
-  return new window.URL(
-    `/login/oauth/authorize?client_id=${ClientID}&scope=${scope}&state=${state}`,
-    urlBase
-  ).toString()
+  // OpenGit: OAuth is disabled, return empty string
+  return ''
 }
 
 export async function requestOAuthToken(
   endpoint: string,
   code: string
 ): Promise<string | null> {
-  try {
-    const urlBase = getHTMLURL(endpoint)
-    const response = await request(
-      urlBase,
-      null,
-      'POST',
-      'login/oauth/access_token',
-      {
-        client_id: ClientID,
-        client_secret: ClientSecret,
-        code: code,
-      }
-    )
-    tryUpdateEndpointVersionFromResponse(endpoint, response)
-
-    const result = await parsedResponse<IAPIAccessToken>(response)
-    return result.access_token
-  } catch (e) {
-    log.warn(`requestOAuthToken: failed with endpoint ${endpoint}`, e)
-    return null
-  }
+  // OpenGit: OAuth is disabled
+  return null
 }
 
 function tryUpdateEndpointVersionFromResponse(
@@ -2419,65 +1351,10 @@ const isKnownThirdPartyHost = (hostname: string) => {
 /**
  * Attempts to determine whether or not the url belongs to a GitHub host.
  *
- * This is a best-effort attempt and may return `undefined` if encountering
- * an error making the discovery request
+ * OpenGit: Always returns false — all remotes are treated as generic Git.
  */
 export async function isGitHubHost(url: string) {
-  const { hostname } = new window.URL(url)
-
-  const endpoint =
-    hostname === 'github.com' || hostname === 'api.github.com'
-      ? getDotComAPIEndpoint()
-      : getEnterpriseAPIURL(url)
-
-  if (isDotCom(endpoint) || isGHE(endpoint)) {
-    return true
-  }
-
-  if (isKnownThirdPartyHost(hostname)) {
-    return false
-  }
-
-  // github.example.com,
-  if (/(^|\.)(github)\./.test(hostname)) {
-    return true
-  }
-
-  // bitbucket.example.com, etc
-  if (/(^|\.)(bitbucket|gitlab)\./.test(hostname)) {
-    return false
-  }
-
-  if (getEndpointVersion(endpoint) !== null) {
-    return true
-  }
-
-  // Add a unique identifier to the URL to make sure our certificate error
-  // supression only catches this request
-  const metaUrl = `${endpoint}/meta?ghd=${uuid()}`
-
-  const ac = new AbortController()
-  const timeoutId = setTimeout(() => ac.abort(), 2000)
-  suppressCertificateErrorFor(metaUrl)
-  try {
-    const response = await fetch(metaUrl, {
-      headers: { 'user-agent': getUserAgent() },
-      signal: ac.signal,
-      credentials: 'omit',
-      method: 'HEAD',
-      redirect: 'error',
-    })
-
-    tryUpdateEndpointVersionFromResponse(endpoint, response)
-
-    return response.headers.has('x-github-request-id')
-  } catch (e) {
-    log.debug(`isGitHubHost: failed with endpoint ${endpoint}`, e)
-    return undefined
-  } finally {
-    clearTimeout(timeoutId)
-    clearCertificateErrorSuppressionFor(metaUrl)
-  }
+  return false
 }
 
 const isRulesetsNotEnabledError = (error: any) =>
