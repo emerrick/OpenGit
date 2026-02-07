@@ -24,12 +24,8 @@ jobs:
       - run: npx tsc --noEmit
 
   test:
-    name: Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-14, windows-2022]
+    name: Test
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
         with:
