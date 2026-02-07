@@ -2,7 +2,6 @@ import { StatsDatabase, ILaunchStats, IDailyMeasures } from './stats-database'
 import {
   Account,
   isDotComAccount,
-  isEnterpriseAccount,
 } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { merge } from '../../lib/merge'

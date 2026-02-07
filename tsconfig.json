@@ -15,6 +15,7 @@
     "jsx": "react",
     "strict": true,
     "outDir": "./out",
+    "skipLibCheck": true,
     "useUnknownInCatchVariables": false,
     "lib": ["ES2023", "DOM", "DOM.Iterable", "ESNext.Array"],
     "types": ["node"]
