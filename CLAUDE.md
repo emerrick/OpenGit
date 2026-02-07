@@ -80,7 +80,7 @@ TypeScript's type system guides us to every broken reference.
 
 ## Phased Removal Plan & Progress
 
-### Phase 0: Branding & First-Launch Bypass *(IN PROGRESS)*
+### Phase 0: Branding & First-Launch Bypass *(COMPLETE)*
 > Make the app launchable without GitHub login. Rebrand to OpenGit.
 
 - [x] `package.json` / `app/package.json` — Update branding to "OpenGit"
