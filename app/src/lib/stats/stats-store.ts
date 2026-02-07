@@ -496,48 +496,14 @@ export class StatsStore implements IStatsStore {
     return now - lastDate > DailyStatsReportInterval
   }
 
-  /** Report any stats which are eligible for reporting. */
+  /** Report any stats which are eligible for reporting.
+   *  OpenGit: Telemetry disabled — this is a no-op. */
   public async reportStats(
     accounts: ReadonlyArray<Account>,
     repositories: ReadonlyArray<Repository>
   ) {
-    if (this.optOut) {
-      return
-    }
-
-    // Never report stats while in dev or test. They could be pretty crazy.
-    if (__DEV__ || process.env.TEST_ENV) {
-      return
-    }
-
-    // don't report until the user has had a chance to view and opt-in for
-    // sharing their stats with us
-    if (!hasShownWelcomeFlow()) {
-      return
-    }
-
-    if (!this.shouldReportDailyStats()) {
-      return
-    }
-
-    const now = Date.now()
-    const payload = await this.getDailyStats(accounts, repositories)
-
-    try {
-      const response = await this.post(payload)
-      if (!response.ok) {
-        throw new Error(
-          `Unexpected status: ${response.statusText} (${response.status})`
-        )
-      }
-
-      log.info('Stats reported.')
-
-      await this.clearDailyStats()
-      setNumber(LastDailyStatsReportKey, now)
-    } catch (e) {
-      log.error('Error reporting stats:', e)
-    }
+    // OpenGit: Telemetry to central.github.com is disabled.
+    return
   }
 
   /** Record the given launch stats. */

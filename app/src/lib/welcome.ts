@@ -5,9 +5,10 @@ const HasShownWelcomeFlowKey = 'has-shown-welcome-flow'
 
 /**
  * Check if the current user has completed the welcome flow.
+ * OpenGit: Always returns true to bypass GitHub sign-in wizard.
  */
 export function hasShownWelcomeFlow(): boolean {
-  return getBoolean(HasShownWelcomeFlowKey, false)
+  return true
 }
 
 /**

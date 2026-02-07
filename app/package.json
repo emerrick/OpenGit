@@ -1,15 +1,15 @@
 {
-  "name": "desktop",
-  "productName": "GitHub Desktop",
-  "bundleID": "com.github.GitHubClient",
-  "companyName": "GitHub, Inc.",
+  "name": "opengit",
+  "productName": "OpenGit",
+  "bundleID": "com.opengit.OpenGit",
+  "companyName": "OpenGit Contributors",
   "version": "3.5.5-beta3",
   "main": "./main.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/desktop/desktop.git"
   },
-  "description": "Simple collaboration from your desktop",
+  "description": "A universal Git GUI client for any remote",
   "author": {
     "name": "GitHub, Inc.",
     "email": "opensource+desktop@github.com",

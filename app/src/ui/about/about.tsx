@@ -210,7 +210,7 @@ export class About extends React.Component<IAboutProps> {
         <DialogError>
           This operating system is no longer supported. Software updates have
           been disabled.{' '}
-          <LinkButton uri="https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/supported-operating-systems">
+          <LinkButton uri="https://github.com/nicholasgasior/OpenGit#supported-os">
             Supported operating systems
           </LinkButton>
         </DialogError>
@@ -222,7 +222,7 @@ export class About extends React.Component<IAboutProps> {
         <DialogError>
           Couldn't determine the last time an update check was performed. You
           may be running an old version. Please try manually checking for
-          updates and contact GitHub Support if the problem persists
+          updates
         </DialogError>
       )
     }
@@ -270,7 +270,7 @@ export class About extends React.Component<IAboutProps> {
           <Row className="logo">
             <img
               src={DesktopLogo}
-              alt="GitHub Desktop"
+              alt="OpenGit"
               width="64"
               height="64"
             />
@@ -294,11 +294,6 @@ export class About extends React.Component<IAboutProps> {
             <p className="no-padding terms-and-license">
               <LinkButton onClick={this.props.onShowAcknowledgements}>
                 License and Open Source Notices
-              </LinkButton>
-            </p>
-            <p className="terms-and-license">
-              <LinkButton uri="https://gh.io/copilot-for-desktop-transparency">
-                Responsible use of Copilot in GitHub Desktop
               </LinkButton>
             </p>
           </div>

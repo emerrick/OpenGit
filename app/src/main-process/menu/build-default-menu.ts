@@ -64,10 +64,10 @@ export function buildDefaultMenu({
 
   if (__DARWIN__) {
     template.push({
-      label: 'GitHub Desktop',
+      label: 'OpenGit',
       submenu: [
         {
-          label: 'About GitHub Desktop',
+          label: 'About OpenGit',
           click: emit('show-about'),
           id: 'about',
         },
@@ -507,19 +507,17 @@ export function buildDefaultMenu({
     label: __DARWIN__ ? 'Report Issue…' : 'Report issue…',
     click() {
       shell
-        .openExternal('https://github.com/desktop/desktop/issues/new/choose')
+        .openExternal('https://github.com/nicholasgasior/OpenGit/issues/new/choose')
         .catch(err => log.error('Failed opening issue creation page', err))
     },
   }
 
   const contactSupportItem: Electron.MenuItemConstructorOptions = {
-    label: __DARWIN__ ? 'Contact GitHub Support…' : '&Contact GitHub support…',
+    label: __DARWIN__ ? 'Community Discussions…' : '&Community discussions…',
     click() {
       shell
-        .openExternal(
-          `https://github.com/contact?from_desktop_app=1&app_version=${app.getVersion()}`
-        )
-        .catch(err => log.error('Failed opening contact support page', err))
+        .openExternal('https://github.com/nicholasgasior/OpenGit/discussions')
+        .catch(err => log.error('Failed opening discussions page', err))
     },
   }
 
@@ -527,7 +525,7 @@ export function buildDefaultMenu({
     label: 'Show User Guides',
     click() {
       shell
-        .openExternal('https://docs.github.com/en/desktop')
+        .openExternal('https://github.com/nicholasgasior/OpenGit/wiki')
         .catch(err => log.error('Failed opening user guides page', err))
     },
   }
@@ -537,7 +535,7 @@ export function buildDefaultMenu({
     click() {
       shell
         .openExternal(
-          'https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/keyboard-shortcuts'
+          'https://github.com/nicholasgasior/OpenGit/wiki/Keyboard-Shortcuts'
         )
         .catch(err => log.error('Failed opening keyboard shortcuts page', err))
     },
@@ -581,7 +579,7 @@ export function buildDefaultMenu({
         ...helpItems,
         separator,
         {
-          label: '&About GitHub Desktop',
+          label: '&About OpenGit',
           click: emit('show-about'),
           id: 'about',
         },
