@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test'
+import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import {
   hasShownWelcomeFlow,
@@ -6,29 +6,8 @@ import {
 } from '../../src/lib/welcome'
 
 describe('Welcome', () => {
-  const key = 'has-shown-welcome-flow'
-
   describe('hasShownWelcomeFlow', () => {
-    beforeEach(() => {
-      localStorage.removeItem(key)
-    })
-
-    it('defaults to false when no value found', () => {
-      assert(!hasShownWelcomeFlow())
-    })
-
-    it('returns false for some non-numeric value', () => {
-      localStorage.setItem(key, 'a')
-      assert(!hasShownWelcomeFlow())
-    })
-
-    it('returns false when zero found', () => {
-      localStorage.setItem(key, '0')
-      assert(!hasShownWelcomeFlow())
-    })
-
-    it('returns true when one found', () => {
-      localStorage.setItem(key, '1')
+    it('always returns true (OpenGit bypasses welcome)', () => {
       assert(hasShownWelcomeFlow())
     })
   })
@@ -36,7 +15,7 @@ describe('Welcome', () => {
   describe('markWelcomeFlowComplete', () => {
     it('sets localStorage to 1', () => {
       markWelcomeFlowComplete()
-      const value = localStorage.getItem(key)
+      const value = localStorage.getItem('has-shown-welcome-flow')
       assert.equal(value, '1')
     })
   })

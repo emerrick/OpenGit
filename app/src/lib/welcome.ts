@@ -1,4 +1,4 @@
-import { getBoolean, setBoolean } from './local-storage'
+import { setBoolean } from './local-storage'
 
 /** The `localStorage` key for whether we've shown the Welcome flow yet. */
 const HasShownWelcomeFlowKey = 'has-shown-welcome-flow'
