@@ -2,10 +2,7 @@ import * as URL from 'url'
 import { Account } from '../models/account'
 
 import { GitProtocol } from './remote-parsing'
-import {
-  isDotCom,
-  isGHE,
-} from './endpoint-capabilities'
+import { isDotCom, isGHE } from './endpoint-capabilities'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
@@ -1224,4 +1221,3 @@ export async function requestOAuthToken(
 export async function isGitHubHost(url: string) {
   return false
 }
-

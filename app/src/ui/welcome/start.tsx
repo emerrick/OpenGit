@@ -24,8 +24,7 @@ export class Start extends React.Component<IStartProps, {}> {
           </h1>
           <p id="start-description" className="welcome-text">
             OpenGit is a fast, open-source Git client that works with any
-            remote. Let's configure Git so your commits are properly
-            attributed.
+            remote. Let's configure Git so your commits are properly attributed.
           </p>
 
           <div className="welcome-main-buttons">

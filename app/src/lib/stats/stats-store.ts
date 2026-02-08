@@ -1,8 +1,5 @@
 import { StatsDatabase, ILaunchStats, IDailyMeasures } from './stats-database'
-import {
-  Account,
-  isDotComAccount,
-} from '../../models/account'
+import { Account, isDotComAccount } from '../../models/account'
 import { Repository } from '../../models/repository'
 import { merge } from '../../lib/merge'
 import { IUiActivityMonitor } from '../../ui/lib/ui-activity-monitor'

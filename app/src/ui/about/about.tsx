@@ -268,12 +268,7 @@ export class About extends React.Component<IAboutProps> {
         {this.renderUpdateErrors()}
         <DialogContent>
           <Row className="logo">
-            <img
-              src={DesktopLogo}
-              alt="OpenGit"
-              width="64"
-              height="64"
-            />
+            <img src={DesktopLogo} alt="OpenGit" width="64" height="64" />
           </Row>
           <h1 id={titleId}>About {name}</h1>
           <p className="no-padding">

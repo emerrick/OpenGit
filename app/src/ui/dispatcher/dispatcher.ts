@@ -1909,7 +1909,6 @@ export class Dispatcher {
     return this.appStore._setShell(shell)
   }
 
-
   public async openOrAddRepository(path: string): Promise<Repository | null> {
     const state = this.appStore.getState()
     const repositories = state.repositories
