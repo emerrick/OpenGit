@@ -3508,7 +3508,6 @@ export class App extends React.Component<IAppProps, IAppState> {
       <Welcome
         dispatcher={this.props.dispatcher}
         accounts={this.state.accounts}
-        signInState={this.state.signInState}
       />
     )
   }

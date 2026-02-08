@@ -1,12 +1,9 @@
 import * as React from 'react'
 import { WelcomeStep } from './welcome'
-import { Dispatcher } from '../dispatcher'
 import { Button } from '../lib/button'
 
 interface IStartProps {
   readonly advance: (step: WelcomeStep) => void
-  readonly dispatcher: Dispatcher
-  readonly loadingBrowserAuth: boolean
 }
 
 /** The first step of the Welcome flow. */

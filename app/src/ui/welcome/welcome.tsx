@@ -4,7 +4,6 @@ import classNames from 'classnames'
 import { Dispatcher } from '../dispatcher'
 import { encodePathAsUrl } from '../../lib/path'
 import { Account } from '../../models/account'
-import { SignInState } from '../../lib/stores'
 import { assertNever } from '../../lib/fatal-error'
 import { Start } from './start'
 import { ConfigureGit } from './configure-git'
@@ -24,7 +23,6 @@ export enum WelcomeStep {
 interface IWelcomeProps {
   readonly dispatcher: Dispatcher
   readonly accounts: ReadonlyArray<Account>
-  readonly signInState: SignInState | null
 }
 
 interface IWelcomeState {
@@ -96,13 +94,7 @@ export class Welcome extends React.Component<IWelcomeProps, IWelcomeState> {
       case WelcomeStep.Start:
       case WelcomeStep.SignInToDotComWithBrowser:
       case WelcomeStep.SignInToEnterprise:
-        return (
-          <Start
-            advance={this.advanceToStep}
-            dispatcher={this.props.dispatcher}
-            loadingBrowserAuth={false}
-          />
-        )
+        return <Start advance={this.advanceToStep} />
 
       case WelcomeStep.ConfigureGit:
         return (

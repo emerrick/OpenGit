@@ -1718,10 +1718,8 @@ export class Dispatcher {
   }
 
   /**
-   * Find an existing repository that can be used for checking out
-   * the passed pull request.
-   *
-   * This method will try to find an opened repository that matches the
+   * Open a repository from a URL action.
+   */
   private async openRepositoryFromUrl(action: IOpenRepositoryFromURLAction) {
     const { url, pr, branch, filepath } = action
 
