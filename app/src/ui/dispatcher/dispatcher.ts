@@ -8,7 +8,6 @@ import {
   getDotComAPIEndpoint,
   IAPICreatePushProtectionBypassResponse,
 } from '../../lib/api'
-import { shell } from '../../lib/app-shell'
 import {
   CompareAction,
   Foldout,
@@ -34,17 +33,8 @@ import {
   getCommitsBetweenCommits,
   getBranches,
   getRebaseSnapshot,
-  getRepositoryType,
 } from '../../lib/git'
 import { isGitOnPath } from '../../lib/is-git-on-path'
-import {
-  IOpenRepositoryFromURLAction,
-  IUnknownAction,
-  URLActionType,
-} from '../../lib/parse-app-url'
-import {
-  matchExistingRepository,
-} from '../../lib/repository-matching'
 import { Shell } from '../../lib/shells'
 import { ILaunchStats, StatsStore } from '../../lib/stats'
 import { AppStore } from '../../lib/stores/app-store'
@@ -102,7 +92,6 @@ import { MergeTreeResult } from '../../models/merge'
 import { UncommittedChangesStrategy } from '../../models/uncommitted-changes-strategy'
 import { IStashEntry } from '../../models/stash-entry'
 import { WorkflowPreferences } from '../../models/workflow-preferences'
-import { resolveWithin } from '../../lib/path'
 import { CherryPickResult } from '../../lib/git/cherry-pick'
 import { sleep } from '../../lib/promise'
 import { DragElement, DragType } from '../../models/drag-drop'
@@ -122,8 +111,6 @@ import { UnreachableCommitsTab } from '../history/unreachable-commits-dialog'
 import { sendNonFatalException } from '../../lib/helpers/non-fatal-exception'
 import { SignInResult } from '../../lib/stores/sign-in-store'
 import { ICustomIntegration } from '../../lib/custom-integration'
-import { isAbsolute } from 'path'
-import { CLIAction } from '../../lib/cli-action'
 import { BypassReasonType } from '../secret-scanning/bypass-push-protection-dialog'
 
 /**
@@ -1922,42 +1909,6 @@ export class Dispatcher {
     return this.appStore._setShell(shell)
   }
 
-  private async checkoutLocalBranch(repository: Repository, branch: string) {
-    let shouldCheckoutBranch = true
-
-    const state = this.repositoryStateManager.get(repository)
-    const branches = state.branchesState.allBranches
-
-    const { tip } = state.branchesState
-
-    if (tip.kind === TipState.Valid) {
-      shouldCheckoutBranch = tip.branch.nameWithoutRemote !== branch
-    }
-
-    const localBranch = branches.find(b => b.nameWithoutRemote === branch)
-
-    // N.B: This looks weird, and it is. _checkoutBranch used
-    // to behave this way (silently ignoring checkout) when given
-    // a branch name string that does not correspond to a local branch
-    // in the git store. When rewriting _checkoutBranch
-    // to remove the support for string branch names the behavior
-    // was moved up to this method to not alter the current behavior.
-    //
-    // https://youtu.be/IjmtVKOAHPM
-    if (shouldCheckoutBranch && localBranch !== undefined) {
-      await this.checkoutBranch(repository, localBranch)
-    }
-  }
-
-  private async openOrCloneRepository(url: string): Promise<Repository | null> {
-    return this.appStore._startOpenInDesktop(() => {
-      this.changeCloneRepositoriesTab(CloneRepositoryTab.Generic)
-      this.showPopup({
-        type: PopupType.CloneRepository,
-        initialURL: url,
-      })
-    })
-  }
 
   public async openOrAddRepository(path: string): Promise<Repository | null> {
     const state = this.appStore.getState()
