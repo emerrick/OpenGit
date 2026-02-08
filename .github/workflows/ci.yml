@@ -1,0 +1,32 @@
+name: OpenGit Build
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - run: yarn install
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Unit tests
+        run: yarn test:unit
+
+      - name: Build (dev)
+        run: yarn build:dev
