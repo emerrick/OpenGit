@@ -1737,66 +1737,6 @@ export class Dispatcher {
    * the passed pull request.
    *
    * This method will try to find an opened repository that matches the
-   * HEAD repository of the PR first and if not found it will try to
-   * find an opened repository that matches the BASE repository of the PR.
-   * Matching in this context means that either the origin remote or the
-   * upstream remote url are equal to the PR ref repository URL.
-   *
-   * With this logic we try to select the best suited repository to open
-   * a PR when triggering a "Open PR from Desktop" action from a browser.
-   *
-   * @param pullRequest the pull request object received from the API.
-   */
-  private getRepositoryFromPullRequest(
-    pullRequest: IAPIPullRequest
-  ): RepositoryWithGitHubRepository | null {
-    const state = this.appStore.getState()
-    const repositories = state.repositories
-    const headUrl = pullRequest.head.repo?.clone_url
-    const baseUrl = pullRequest.base.repo?.clone_url
-
-    // This likely means that the base repository has been deleted
-    // and we don't support checking out from refs/pulls/NNN/head
-    // yet so we'll bail for now.
-    if (headUrl === undefined || baseUrl === undefined) {
-      return null
-    }
-
-    for (const repository of repositories) {
-      if (this.doesRepositoryMatchUrl(repository, headUrl)) {
-        return repository
-      }
-    }
-
-    for (const repository of repositories) {
-      if (this.doesRepositoryMatchUrl(repository, baseUrl)) {
-        return repository
-      }
-    }
-
-    return null
-  }
-
-  private doesRepositoryMatchUrl(
-    repo: Repository | CloningRepository,
-    url: string
-  ): repo is RepositoryWithGitHubRepository {
-    if (repo instanceof Repository && isRepositoryWithGitHubRepository(repo)) {
-      const originRepoUrl = repo.gitHubRepository.htmlURL
-      const upstreamRepoUrl = repo.gitHubRepository.parent?.htmlURL ?? null
-
-      if (originRepoUrl !== null && urlsMatch(originRepoUrl, url)) {
-        return true
-      }
-
-      if (upstreamRepoUrl !== null && urlsMatch(upstreamRepoUrl, url)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
   private async openRepositoryFromUrl(action: IOpenRepositoryFromURLAction) {
     const { url, pr, branch, filepath } = action
 
