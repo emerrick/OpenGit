@@ -1856,55 +1856,11 @@ export class Dispatcher {
   }
 
   private async openPullRequestFromUrl(
-    url: string,
-    pr: string
+    _url: string,
+    _pr: string
   ): Promise<RepositoryWithGitHubRepository | null> {
-    const pullRequest = await this.appStore.fetchPullRequest(url, pr)
-
-    if (pullRequest === null) {
-      return null
-    }
-
-    // Find the repository where the PR is created in Desktop.
-    let repository: Repository | null =
-      this.getRepositoryFromPullRequest(pullRequest)
-
-    if (repository !== null) {
-      await this.selectRepository(repository)
-    } else {
-      repository = await this.openOrCloneRepository(url)
-    }
-
-    if (repository === null) {
-      log.warn(
-        `Open Repository from URL failed, did not find or clone repository: ${url}`
-      )
-      return null
-    }
-    if (!isRepositoryWithGitHubRepository(repository)) {
-      log.warn(
-        `Received a non-GitHub repository when opening repository from URL: ${url}`
-      )
-      return null
-    }
-
-    // ensure a fresh clone repository has it's in-memory state
-    // up-to-date before performing the "Clone in Desktop" steps
-    await this.appStore._refreshRepository(repository)
-
-    if (pullRequest.head.repo === null) {
-      return null
-    }
-
-    await this.appStore._checkoutPullRequest(
-      repository,
-      pullRequest.number,
-      pullRequest.head.repo.owner.login,
-      pullRequest.head.repo.clone_url,
-      pullRequest.head.ref
-    )
-
-    return repository
+    // OpenGit: Pull request handling is disabled
+    return null
   }
 
   public async dispatchCLIAction(action: CLIAction) {

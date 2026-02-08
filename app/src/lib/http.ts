@@ -55,16 +55,6 @@ export class APIError extends Error {
 }
 
 /**
- * Deserialize the HTTP response body into an expected object shape
- *
- * Note: this doesn't validate the expected shape, and will only fail if it
- * encounters invalid JSON.
- */
-async function deserialize<T>(_response: Response): Promise<T> {
-  throw new Error('HTTP deserialization is disabled in OpenGit')
-}
-
-/**
  * Convert the endpoint and resource path into an absolute URL. As the app bakes
  * the `/api/v3/` path into the endpoint, we need to prevent duplicating this when
  * the API returns pagination headers that also include the `/api/v3/` fragment.

@@ -1,15 +1,10 @@
 import * as URL from 'url'
 import { Account } from '../models/account'
 
-import {
-  HTTPMethod,
-  APIError,
-} from './http'
 import { GitProtocol } from './remote-parsing'
 import {
   isDotCom,
   isGHE,
-  updateEndpointVersion,
 } from './endpoint-capabilities'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
 
@@ -25,32 +20,10 @@ type AffiliationFilter =
   | 'collaborator,organization_member'
   | 'owner,collaborator,organization_member'
 
-/** Response type of GraphQL query of Copilot-related info */
-type ViewerCopilotResponse = {
-  readonly data: {
-    readonly viewer: {
-      readonly copilotEndpoints: {
-        readonly api: string
-      }
-      readonly isCopilotDesktopEnabled: boolean
-    }
-  }
-}
-
 /** Copilot-related info relevant to Desktop */
 type UserCopilotInfo = {
   readonly isCopilotDesktopEnabled: boolean
   readonly copilotEndpoint: string
-}
-
-/** Response type Copilot chat completions response API */
-type CopilotChatCompletionResponse = {
-  readonly choices: ReadonlyArray<{
-    readonly index: number
-    readonly message: {
-      readonly content: string
-    }
-  }>
 }
 
 /**
@@ -115,9 +88,6 @@ if (!ClientID || !ClientID.length || !ClientSecret || !ClientSecret.length) {
 }
 
 export type GitHubAccountType = 'User' | 'Organization'
-
-/** The OAuth scopes we want to request */
-const oauthScopes = ['repo', 'user', 'workflow']
 
 /**
  * Information about a repository as returned by the GitHub API.
@@ -287,11 +257,6 @@ export interface IAPIMentionableUser {
 interface ICopilotCommitMessage {
   readonly title: string
   readonly description: string
-}
-
-/** The response we get from the desktop_internal/features endpoint. */
-interface IUserFeaturesResponse {
-  readonly features: ReadonlyArray<string>
 }
 
 /**
@@ -652,13 +617,6 @@ export interface IAPIComment {
   readonly created_at: string
 }
 
-/** The server response when handling the OAuth callback (with code) to obtain an access token */
-interface IAPIAccessToken {
-  readonly access_token: string
-  readonly scope: string
-  readonly token_type: string
-}
-
 /** The response we receive from fetching mentionables. */
 interface IAPIMentionablesResponse {
   readonly etag: string | undefined
@@ -776,23 +734,9 @@ export function getNextPagePathWithIncreasingPageSize(response: Response) {
   return nextPath
 }
 
-/**
- * Returns an ISO 8601 time string with second resolution instead of
- * the standard javascript toISOString which returns millisecond
- * resolution. The GitHub API doesn't return dates with milliseconds
- * so we won't send any back either.
- */
-function toGitHubIsoDateString(date: Date) {
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
-}
-
 interface IAPIAliveSignedChannel {
   readonly channel_name: string
   readonly signed_channel: string
-}
-
-interface IAPIAliveWebSocket {
-  readonly url: string
 }
 
 type TokenInvalidatedCallback = (endpoint: string, token: string) => void
@@ -817,30 +761,18 @@ export class API {
     this.tokenInvalidatedListeners.add(callback)
   }
 
-  private static emitTokenInvalidated(endpoint: string, token: string) {
-    this.tokenInvalidatedListeners.forEach(callback =>
-      callback(endpoint, token)
-    )
-  }
-
   /** Create a new API client from the given account. */
   public static fromAccount(account: Account): API {
     return new API(account.endpoint, account.token, account.copilotEndpoint)
   }
 
-  private endpoint: string
-  private token: string
-  private copilotEndpoint?: string
-
   /** Create a new API client for the endpoint, authenticated with the token. */
   public constructor(
-    endpoint: string,
-    token: string,
-    copilotEndpoint?: string
+    _endpoint: string,
+    _token: string,
+    _copilotEndpoint?: string
   ) {
-    this.endpoint = endpoint
-    this.token = token
-    this.copilotEndpoint = copilotEndpoint
+    // OpenGit: parameters ignored, no API calls are made
   }
 
   public async getAliveDesktopChannel(): Promise<IAPIAliveSignedChannel | null> {
@@ -947,8 +879,12 @@ export class API {
     return []
   }
 
-  public async fetchPullRequest(owner: string, name: string, prNumber: string) {
-    throw new Error('fetchPullRequest is disabled in OpenGit')
+  public async fetchPullRequest(
+    owner: string,
+    name: string,
+    prNumber: string
+  ): Promise<IAPIPullRequest | null> {
+    return null
   }
 
   public async fetchPullRequestReview(
@@ -956,7 +892,7 @@ export class API {
     name: string,
     prNumber: string,
     reviewId: string
-  ) {
+  ): Promise<IAPIPullRequestReview | null> {
     return null
   }
 
@@ -1059,7 +995,7 @@ export class API {
     return false
   }
 
-  public async getAvatarToken() {
+  public async getAvatarToken(): Promise<string | null> {
     return null
   }
 
@@ -1116,42 +1052,6 @@ export class API {
     id: number
   ): Promise<IAPIRepoRuleset | null> {
     return null
-  }
-
-  private async fetchAll<T>(path: string, options?: IFetchAllOptions<T>) {
-    return []
-  }
-
-  private async request(
-    endpoint: string,
-    method: HTTPMethod,
-    path: string,
-    options: {
-      body?: Object
-      customHeaders?: Object
-      reloadCache?: boolean
-    } = {}
-  ): Promise<Response> {
-    throw new Error('API.request is disabled in OpenGit')
-  }
-
-  private async ghRequest(
-    method: HTTPMethod,
-    path: string,
-    options: {
-      body?: Object
-      customHeaders?: Object
-      reloadCache?: boolean
-    } = {}
-  ): Promise<Response> {
-    throw new Error('API.ghRequest is disabled in OpenGit')
-  }
-
-  private async copilotRequest(
-    path: string,
-    message: string
-  ): Promise<CopilotChatCompletionResponse> {
-    throw new Error('Copilot requests are disabled in OpenGit')
   }
 
   public async getFetchPollInterval(
@@ -1316,38 +1216,6 @@ export async function requestOAuthToken(
   return null
 }
 
-function tryUpdateEndpointVersionFromResponse(
-  endpoint: string,
-  response: Response
-) {
-  const gheVersion = response.headers.get('x-github-enterprise-version')
-  if (gheVersion !== null) {
-    updateEndpointVersion(endpoint, gheVersion)
-  }
-}
-
-const knownThirdPartyHosts = new Set([
-  'dev.azure.com',
-  'gitlab.com',
-  'bitbucket.org',
-  'amazonaws.com',
-  'visualstudio.com',
-])
-
-const isKnownThirdPartyHost = (hostname: string) => {
-  if (knownThirdPartyHosts.has(hostname)) {
-    return true
-  }
-
-  for (const knownHost of knownThirdPartyHosts) {
-    if (hostname.endsWith(`.${knownHost}`)) {
-      return true
-    }
-  }
-
-  return false
-}
-
 /**
  * Attempts to determine whether or not the url belongs to a GitHub host.
  *
@@ -1357,10 +1225,3 @@ export async function isGitHubHost(url: string) {
   return false
 }
 
-const isRulesetsNotEnabledError = (error: any) =>
-  error instanceof APIError &&
-  error.responseStatus === 403 &&
-  /upgrade.*to enable this feature.*/i.test(error.apiError?.message ?? '')
-
-const isNotFoundApiError = (error: any) =>
-  error instanceof APIError && error.responseStatus === 404
