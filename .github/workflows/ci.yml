@@ -30,3 +30,17 @@ jobs:
 
       - name: Build (dev)
         run: yarn build:dev
+
+      - name: Generate build tag
+        id: build-tag
+        shell: bash
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y%m%d)
+          echo "tag=${SHORT_SHA}-${DATE}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenGit-dev-${{ steps.build-tag.outputs.tag }}
+          path: dist/
