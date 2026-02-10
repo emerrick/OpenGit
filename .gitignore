@@ -1,5 +1,6 @@
 out/
 dist/
+GitHubDesktop-dev-win32-x64/
 node_modules/
 coverage/
 npm-debug.log
